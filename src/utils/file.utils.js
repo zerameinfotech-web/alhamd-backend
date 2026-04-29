@@ -35,7 +35,7 @@ class FileUtils {
         // Check if base64 has data URL prefix
         if (base64Data.startsWith("data:")) {
           const matches = base64Data.match(
-            /^data:([A-Za-z-+\/]+);base64,(.+)$/
+            /^data:([A-Za-z-+\/]+);base64,(.+)$/,
           );
           if (matches && matches.length === 3) {
             fileData = Buffer.from(matches[2], "base64");
@@ -52,7 +52,7 @@ class FileUtils {
         // Check if base64 has data URL prefix
         if (base64Data.startsWith("data:")) {
           const matches = base64Data.match(
-            /^data:([A-Za-z-+\/]+);base64,(.+)$/
+            /^data:([A-Za-z-+\/]+);base64,(.+)$/,
           );
           if (matches && matches.length === 3) {
             fileData = Buffer.from(matches[2], "base64");
@@ -157,7 +157,9 @@ class FileUtils {
    */
   static getFileUrl(fileName) {
     if (!fileName) return null;
-    const apiUrl = process.env.API_URL || "http://localhost:30011";
+    const apiUrl =
+      process.env.API_URL ||
+      "https://alhamd-backend-production.up.railway.app/api/";
     try {
       const url = new URL(apiUrl);
       return `${url.origin}/api/uploads/${fileName}`;

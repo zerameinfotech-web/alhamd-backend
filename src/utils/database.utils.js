@@ -108,15 +108,16 @@ class DatabaseUtils {
       const offset = (page - 1) * limit;
       const columnStr = Array.isArray(columns) ? columns.join(", ") : columns;
 
-      let sql = `SELECT ${columnStr} FROM ${tableName}`;
-      if (whereClause) sql += ` WHERE ${whereClause}`;
-      sql += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
-
       const safeLimit = isNaN(parseInt(limit)) ? 10 : parseInt(limit);
       const safeOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
-      const safeParams = [...whereParams.map(this._mapValue), safeLimit, safeOffset];
 
-      const [rows] = await promisePool.execute(sql, safeParams);
+      let sql = `SELECT ${columnStr} FROM ${tableName}`;
+      if (whereClause) sql += ` WHERE ${whereClause}`;
+      sql += ` ORDER BY ${orderBy} LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+
+      const safeParams = whereParams.map(this._mapValue);
+
+      const [rows] = await promisePool.query(sql, safeParams);
       const total = await this.count(tableName, whereClause, whereParams);
 
       return {

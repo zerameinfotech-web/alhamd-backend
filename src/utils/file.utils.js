@@ -159,7 +159,7 @@ class FileUtils {
     if (!fileName) return null;
     const apiUrl =
       process.env.API_URL ||
-      "https://alhamd-backend-production.up.railway.app/api/";
+      "https://alhamd-backend-production.up.railway.app/api/uploads/";
     try {
       const url = new URL(apiUrl);
       return `${url.origin}/api/uploads/${fileName}`;

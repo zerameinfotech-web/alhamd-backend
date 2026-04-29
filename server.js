@@ -182,10 +182,9 @@ const startServer = async () => {
     // Start migrations
     // await runMigrations();
 
-    // Create uploads directory if it doesn't exist
-    if (!fs.existsSync("uploads")) {
-      fs.mkdirSync("uploads");
-    }
+    // Create uploads directory if it doesn't exist (honors UPLOAD_PATH env var)
+    const { FILE_UPLOAD } = require("./src/config/constants");
+    fs.mkdirSync(FILE_UPLOAD.UPLOAD_PATH, { recursive: true });
 
     // Start server
     app.listen(PORT, async () => {

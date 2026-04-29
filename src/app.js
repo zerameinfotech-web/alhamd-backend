@@ -53,6 +53,7 @@ const qcRoutes = require("./routes/qc.routes");
 
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
+const { FILE_UPLOAD } = require("./config/constants");
 
 const app = express();
 
@@ -93,9 +94,15 @@ if (process.env.NODE_ENV === "development") {
   app.use(morgan("combined"));
 }
 
-// Static files
-// app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
-const uploadsDir = path.resolve(process.cwd(), "uploads");
+// Static files - resolve against cwd so a relative UPLOAD_PATH (e.g. "./uploads")
+// matches multer/file.utils which also resolve relative to cwd.
+const uploadsDir = path.isAbsolute(FILE_UPLOAD.UPLOAD_PATH)
+  ? FILE_UPLOAD.UPLOAD_PATH
+  : path.resolve(process.cwd(), FILE_UPLOAD.UPLOAD_PATH);
+
+// Ensure the directory exists at boot so static middleware has a stable target
+require("fs").mkdirSync(uploadsDir, { recursive: true });
+
 app.use(
   "/api/uploads",
   (req, res, next) => {
@@ -108,13 +115,22 @@ app.use(
 
 // Diagnostic route for uploads
 app.get("/api/test-file/:filename", (req, res) => {
+  const fs = require("fs");
   const filePath = path.join(uploadsDir, req.params.filename);
-  const exists = require("fs").existsSync(filePath);
+  let dirListing = [];
+  try {
+    dirListing = fs.readdirSync(uploadsDir).slice(0, 20);
+  } catch (e) {
+    dirListing = [`error: ${e.message}`];
+  }
   res.json({
-    exists,
+    exists: fs.existsSync(filePath),
     path: filePath,
+    uploadsDir,
+    uploadPathConfig: FILE_UPLOAD.UPLOAD_PATH,
     wd: process.cwd(),
-    dirname: __dirname
+    dirname: __dirname,
+    sampleFiles: dirListing,
   });
 });
 

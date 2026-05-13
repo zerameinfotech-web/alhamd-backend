@@ -55,6 +55,20 @@ class PurchaseOrderController {
     }
   }
 
+  static async createBatch(req, res) {
+    try {
+      const list = Array.isArray(req.body.list) ? req.body.list : [];
+      if (list.length === 0) {
+        return res.status(400).json({ success: false, message: "No PO entries provided" });
+      }
+      const created = await PurchaseOrderModel.createBatch({ list });
+      res.status(201).json({ success: true, data: created, message: `${created.length} Purchase Order(s) created` });
+    } catch (err) {
+      console.error("Error creating batch POs:", err);
+      res.status(500).json({ success: false, message: err.message || "Server error" });
+    }
+  }
+
   static async generateNextCode(req, res) {
     try {
       const nextCode = await PurchaseOrderModel.generateNextCode();

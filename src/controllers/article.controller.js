@@ -4,12 +4,24 @@ const AttachmentService = require("../services/attachment.service");
 
 const ENTITY_TYPE_ARTICLE = "articleImage";
 
+const parseColours = (raw) => {
+    if (Array.isArray(raw)) return raw;
+    if (raw === null || raw === undefined || raw === '') return [];
+    if (typeof raw !== 'string') return [];
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('[')) {
+        try { return JSON.parse(trimmed); } catch (e) { /* fall through */ }
+    }
+    return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+};
+
 const getArticleWithImage = async (id) => {
     const article = await ArticleModel.getById(id);
     if (!article) return null;
     const attachments = await AttachmentService.getAttachments(id, ENTITY_TYPE_ARTICLE);
     if (typeof article.itemGroup === 'string') { try { article.itemGroup = JSON.parse(article.itemGroup); } catch(e) { article.itemGroup = []; } }
     else if (!article.itemGroup) article.itemGroup = [];
+    article.colours = parseColours(article.colours);
     return {
         ...article,
         articleImage: attachments.map(a => ({
@@ -72,8 +84,7 @@ exports.getAll = async (req, res) => {
         
         const mappedList = await Promise.all(result.list.map(async (a) => {
             const attachments = await AttachmentService.getAttachments(a.id, ENTITY_TYPE_ARTICLE);
-            if (typeof a.colours === 'string') { try { a.colours = JSON.parse(a.colours); } catch(e) { a.colours = []; } }
-            else if (!a.colours) a.colours = [];
+            a.colours = parseColours(a.colours);
             if (typeof a.itemGroup === 'string') { try { a.itemGroup = JSON.parse(a.itemGroup); } catch(e) { a.itemGroup = []; } }
             else if (!a.itemGroup) a.itemGroup = [];
             return {

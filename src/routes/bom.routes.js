@@ -7,6 +7,8 @@ router.post("/create", bomController.create);
 router.post("/list", bomController.getAll);
 router.post("/update", bomController.update);
 router.post("/single", bomController.getById);
+router.post("/by-orders", bomController.getByOrders);
+router.post("/load-by-ids", bomController.loadByIds);
 router.post("/delete", bomController.delete);
 router.get("/update-legacy-codes", bomController.updateLegacyCodes);
 

@@ -183,6 +183,7 @@ app.use("/api/grn", grnRoutes);
 app.use("/api/returns", returnRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/qc", qcRoutes);
+app.use("/api/mrp", require("./routes/mrp.routes"));
 // app.use("/api/production-scan", productionScanRoutes);
 // app.use("/api/dc", deliveryChallanRoutes);
 // app.use("/api/dashboard", dashboardRoutes);

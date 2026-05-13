@@ -9,5 +9,6 @@ router.post("/delete", PurchaseOrderController.delete);
 router.get("/next-code", PurchaseOrderController.generateNextCode);
 router.post("/list-bom-wise", PurchaseOrderController.listBOMWise);
 router.post("/insert", PurchaseOrderController.create);
+router.post("/insert-batch", PurchaseOrderController.createBatch);
 
 module.exports = router;

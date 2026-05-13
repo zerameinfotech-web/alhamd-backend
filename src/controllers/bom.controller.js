@@ -50,6 +50,36 @@ const bomController = {
     }
   },
 
+  getByOrders: async (req, res) => {
+    try {
+      const orderIds = Array.isArray(req.body.orderIds) ? req.body.orderIds.map(Number).filter(Boolean) : [];
+      if (orderIds.length === 0) {
+        return res.status(200).json({ success: true, groups: [] });
+      }
+      const result = await BOM.getByOrders(orderIds);
+      res.status(200).json({ success: true, groups: result });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
+  loadByIds: async (req, res) => {
+    try {
+      const bomIds = Array.isArray(req.body.bomIds) ? req.body.bomIds.map(Number).filter(Boolean) : [];
+      if (bomIds.length === 0) {
+        return res.status(200).json({ success: true, list: [] });
+      }
+      const list = [];
+      for (const id of bomIds) {
+        const data = await BOM.getById(id);
+        if (data) list.push(data);
+      }
+      res.status(200).json({ success: true, list });
+    } catch (error) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  },
+
   delete: async (req, res) => {
     try {
       const success = await BOM.delete(req.body.id);
@@ -58,7 +88,8 @@ const bomController = {
       }
       res.status(200).json({ success: true, message: "BOM deleted successfully" });
     } catch (error) {
-      res.status(500).json({ success: false, message: error.message });
+      const status = error.code === 'BOM_HAS_POS' ? 409 : 500;
+      res.status(status).json({ success: false, message: error.message });
     }
   },
 

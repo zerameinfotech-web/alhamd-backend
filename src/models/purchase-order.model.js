@@ -29,20 +29,88 @@ class PurchaseOrderModel {
     try {
         await DatabaseUtils.query("ALTER TABLE tbl_purchase_order_items ADD COLUMN orderId INT AFTER poId");
     } catch (e) {}
+    // Ensure Items table has bomId (for per-vendor PO across multiple BOMs)
+    try {
+        await DatabaseUtils.query("ALTER TABLE tbl_purchase_order_items ADD COLUMN bomId INT AFTER orderId");
+    } catch (e) {}
   }
 
   static async generateNextCode() {
     const rows = await DatabaseUtils.query(
-      "SELECT poNo FROM tbl_purchase_order ORDER BY id DESC LIMIT 1"
+      "SELECT poNo FROM tbl_purchase_order WHERE poNo REGEXP '^PO-[0-9]+'"
     );
-    if (rows.length === 0) return "PO-0001";
+    let maxBase = 0;
+    for (const r of rows) {
+      const m = String(r.poNo || '').match(/^PO-(\d+)/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n > maxBase) maxBase = n;
+      }
+    }
+    const next = maxBase + 1;
+    return `PO-${String(next).padStart(4, '0')}`;
+  }
 
-    const lastCode = rows[0].poNo;
-    const match = lastCode.match(/\d+/);
-    const lastNum = match ? parseInt(match[0], 10) : 0;
-    const newNum = lastNum + 1;
+  static async createBatch(payload) {
+    await this._ensureSchema();
+    return await DatabaseUtils.executeTransaction(async (connection) => {
+      const createdIds = [];
+      for (const data of payload.list) {
+        const poId = await DatabaseUtils.insert("tbl_purchase_order", {
+          poNo: data.poNo,
+          poDate: data.poDate,
+          bomId: data.bomId,
+          bomSectionId: data.bomSectionId || null,
+          supplierId: data.supplierId,
+          supplierContact: data.supplierContact || null,
+          paymentTerms: data.paymentTerms || null,
+          deliveryDate: data.deliveryDate || null,
+          delayDays: data.delayDays || 0,
+          warehouseId: data.warehouseId || null,
+          warehouseName: data.warehouseName || null,
+          warehouseLocation: data.warehouseLocation || null,
+          terms: data.terms || null,
+          addressLine1: data.addressLine1 || null,
+          addressLine2: data.addressLine2 || null,
+          city: data.city || null,
+          state: data.state || null,
+          country: data.country || null,
+          postalCode: data.postalCode || null,
+          supplierGst: data.supplierGst || null,
+          totalValue: data.totalValue || 0,
+          status: data.status || 'Draft'
+        }, connection);
 
-    return `PO-${String(newNum).padStart(4, '0')}`;
+        if (data.items && Array.isArray(data.items)) {
+          for (const item of data.items) {
+            await DatabaseUtils.insert("tbl_purchase_order_items", {
+              poId,
+              orderId: item.orderId || null,
+              bomId: item.bomId || null,
+              itemGroupId: item.itemGroupId || null,
+              materialId: item.materialId || null,
+              materialName: item.materialName || null,
+              uomId: item.uomId || null,
+              color: item.color || null,
+              bomQty: item.bomQty || 0,
+              bomPrice: item.bomPrice || 0,
+              orderQty: item.orderQty || 0,
+              rate: item.rate || 0,
+              totalAmount: item.totalAmount || 0,
+              gstSlab: item.gstSlab || null,
+              gstPrice: item.gstPrice || 0,
+              materialType: item.materialType || 'Local',
+              dutyPercentage: item.dutyPercentage || 0,
+              dutyAmount: item.dutyAmount || 0,
+              clearingPercentage: item.clearingPercentage || 0,
+              clearingAmount: item.clearingAmount || 0
+            }, connection);
+          }
+        }
+        createdIds.push({ id: poId, poNo: data.poNo, supplierId: data.supplierId });
+      }
+      return createdIds;
+    });
   }
 
   static async create(data) {

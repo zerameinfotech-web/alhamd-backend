@@ -30,8 +30,9 @@ class MaterialModel {
             `${TABLE} m
              LEFT JOIN tbl_item_group ig ON m.itemGroupId = ig.id
              LEFT JOIN tbl_uom u ON m.uomId = u.id
-             LEFT JOIN tbl_colour c ON m.colourId = c.id`,
-            "m.*, ig.name as itemGroupName, u.name as uomName, COALESCE(c.name, m.colour) as colourName",
+             LEFT JOIN tbl_colour c ON m.colourId = c.id
+             LEFT JOIN tbl_currency cur ON m.currencyId = cur.id`,
+            "m.*, ig.name as itemGroupName, u.name as uomName, COALESCE(c.name, m.colour) as colourName, cur.code as currencyCode, cur.symbol as currencySymbol",
             whereClause,
             whereParams,
             page,

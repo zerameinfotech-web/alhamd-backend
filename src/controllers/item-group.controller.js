@@ -92,6 +92,51 @@ exports.delete = async (req, res) => {
     }
 };
 
+exports.getDropdown = async (req, res) => {
+    try {
+        const DatabaseUtils = require("../utils/database.utils");
+        const groups = await DatabaseUtils.query(
+            `SELECT id, code, name FROM tbl_item_group WHERE status != 'Deleted' ORDER BY name ASC`
+        );
+        const materials = await DatabaseUtils.query(
+            `SELECT m.id AS materialId, m.code AS materialCode, m.name AS materialName,
+                    m.itemGroupId, m.uomId, u.name AS uomName,
+                    m.colourId, COALESCE(c.name, m.colour) AS colourName,
+                    m.gstSlab, m.price
+             FROM tbl_material m
+             LEFT JOIN tbl_uom u ON m.uomId = u.id
+             LEFT JOIN tbl_colour c ON m.colourId = c.id
+             WHERE m.status != 'Deleted' AND m.itemGroupId IS NOT NULL`
+        );
+        const byGroup = new Map();
+        materials.forEach(m => {
+            const slabNum = Number(m.gstSlab || 0);
+            const mapped = {
+                materialId: m.materialId,
+                materialCode: m.materialCode,
+                materialName: m.materialName,
+                itemGroupId: m.itemGroupId,
+                uomId: m.uomId,
+                uomName: m.uomName,
+                colourId: m.colourId,
+                colourName: m.colourName,
+                gstSlab: `${slabNum}%`,
+                purchasePrice: Number(m.price || 0),
+            };
+            const arr = byGroup.get(m.itemGroupId) || [];
+            arr.push(mapped);
+            byGroup.set(m.itemGroupId, arr);
+        });
+        const list = groups.map(g => ({
+            ...g,
+            materials: byGroup.get(g.id) || []
+        }));
+        ResponseUtils.success(res, "Item Group dropdown fetched", list);
+    } catch (error) {
+        ResponseUtils.error(res, error.message, 500);
+    }
+};
+
 exports.generateCode = async (req, res) => {
     try {
         const nextCode = await ItemGroupModel.generateNextCode();

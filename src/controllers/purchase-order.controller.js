@@ -3,8 +3,8 @@ const PurchaseOrderModel = require("../models/purchase-order.model");
 class PurchaseOrderController {
   static async list(req, res) {
     try {
-      const { page, limit, searchTerm, bomId } = req.body;
-      const result = await PurchaseOrderModel.list(page, limit, searchTerm, bomId);
+      const { page, limit, searchTerm, bomId, poType } = req.body;
+      const result = await PurchaseOrderModel.list(page, limit, searchTerm, bomId, poType);
       res.status(200).json({ success: true, ...result });
     } catch (err) {
       console.error("Error listing POs:", err);

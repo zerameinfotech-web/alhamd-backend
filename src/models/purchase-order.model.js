@@ -14,7 +14,10 @@ class PurchaseOrderModel {
       "ALTER TABLE tbl_purchase_order ADD COLUMN state VARCHAR(100) AFTER city",
       "ALTER TABLE tbl_purchase_order ADD COLUMN country VARCHAR(100) AFTER state",
       "ALTER TABLE tbl_purchase_order ADD COLUMN postalCode VARCHAR(20) AFTER country",
-      "ALTER TABLE tbl_purchase_order ADD COLUMN supplierGst VARCHAR(50) AFTER postalCode"
+      "ALTER TABLE tbl_purchase_order ADD COLUMN supplierGst VARCHAR(50) AFTER postalCode",
+      "ALTER TABLE tbl_purchase_order ADD COLUMN poType VARCHAR(20) DEFAULT 'Regular' AFTER supplierGst",
+      "ALTER TABLE tbl_purchase_order MODIFY COLUMN supplierId INT NULL",
+      "ALTER TABLE tbl_purchase_order MODIFY COLUMN bomId INT NULL"
     ];
 
     for (const sql of columns) {
@@ -59,9 +62,9 @@ class PurchaseOrderModel {
         const poId = await DatabaseUtils.insert("tbl_purchase_order", {
           poNo: data.poNo,
           poDate: data.poDate,
-          bomId: data.bomId,
+          bomId: data.bomId || null,
           bomSectionId: data.bomSectionId || null,
-          supplierId: data.supplierId,
+          supplierId: data.supplierId || null,
           supplierContact: data.supplierContact || null,
           paymentTerms: data.paymentTerms || null,
           deliveryDate: data.deliveryDate || null,
@@ -77,6 +80,7 @@ class PurchaseOrderModel {
           country: data.country || null,
           postalCode: data.postalCode || null,
           supplierGst: data.supplierGst || null,
+          poType: data.poType || 'Regular',
           totalValue: data.totalValue || 0,
           status: data.status || 'Draft'
         }, connection);
@@ -120,9 +124,9 @@ class PurchaseOrderModel {
       const poId = await DatabaseUtils.insert("tbl_purchase_order", {
         poNo: data.poNo,
         poDate: data.poDate,
-        bomId: data.bomId,
+        bomId: data.bomId || null,
         bomSectionId: data.bomSectionId || null,
-        supplierId: data.supplierId,
+        supplierId: data.supplierId || null,
         supplierContact: data.supplierContact || null,
         paymentTerms: data.paymentTerms || null,
         deliveryDate: data.deliveryDate || null,
@@ -138,6 +142,7 @@ class PurchaseOrderModel {
         country: data.country || null,
         postalCode: data.postalCode || null,
         supplierGst: data.supplierGst || null,
+        poType: data.poType || 'Regular',
         totalValue: data.totalValue || 0,
         status: data.status || 'Draft'
       }, connection);
@@ -181,7 +186,7 @@ class PurchaseOrderModel {
     });
   }
 
-  static async list(page = 1, limit = 10, searchTerm = "", bomId = null) {
+  static async list(page = 1, limit = 10, searchTerm = "", bomId = null, poType = null) {
     let whereClause = "1=1";
     let whereParams = [];
 
@@ -194,6 +199,12 @@ class PurchaseOrderModel {
     if (bomId) {
       whereClause += " AND po.bomId = ?";
       whereParams.push(bomId);
+    }
+
+    if (poType === 'General') {
+      whereClause += " AND po.poType = 'General'";
+    } else if (poType === 'Regular') {
+      whereClause += " AND (po.poType = 'Regular' OR po.poType IS NULL)";
     }
 
     // Base PO no = part before vendor suffix `-NN`. PO-0042-01 → PO-0042.
@@ -302,9 +313,9 @@ class PurchaseOrderModel {
       // 1. Update Header
       await DatabaseUtils.update("tbl_purchase_order", {
         poDate: data.poDate,
-        bomId: data.bomId,
+        bomId: data.bomId || null,
         bomSectionId: data.bomSectionId || null,
-        supplierId: data.supplierId,
+        supplierId: data.supplierId || null,
         supplierContact: data.supplierContact || null,
         paymentTerms: data.paymentTerms || null,
         deliveryDate: data.deliveryDate || null,
@@ -320,6 +331,7 @@ class PurchaseOrderModel {
         country: data.country || null,
         postalCode: data.postalCode || null,
         supplierGst: data.supplierGst || null,
+        poType: data.poType || 'Regular',
         totalValue: data.totalValue || 0,
         status: data.status || 'Draft'
       }, "id = ?", [id], connection);

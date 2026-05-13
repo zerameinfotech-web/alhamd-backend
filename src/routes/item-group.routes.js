@@ -8,5 +8,6 @@ router.post("/update", controller.update);
 router.post("/list", controller.getAll);
 router.post("/single", controller.getById);
 router.post("/delete", controller.delete);
+router.post("/dropdown", controller.getDropdown);
 
 module.exports = router;

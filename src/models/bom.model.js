@@ -227,13 +227,18 @@ const BOM = {
     // Get Sections (fallback to BOM header articleId for old records)
     const sections = await DatabaseUtils.query(
       `SELECT s.*, a.id as art_id, a.name as art_name, a.code as art_code, a.style as art_style, a.defaultColour as art_colour, a.season as art_season, a.itemGroup as art_itemGroup, a.sizeGroupId as art_sizeGroupId,
-              sea.name as seasonName, col.name as colourName
+              sea.name as seasonName, col.name as colourName,
+              (SELECT COALESCE(c2.name, oi.colour)
+                 FROM tbl_order_items oi
+                 LEFT JOIN tbl_colour c2 ON oi.colourId = c2.id
+                 WHERE oi.orderId = s.orderId AND oi.articleId = COALESCE(s.articleId, ?)
+                 LIMIT 1) AS orderColour
          FROM tbl_bom_sections s
          LEFT JOIN tbl_article a ON a.id = COALESCE(s.articleId, ?)
          LEFT JOIN tbl_season sea ON s.seasonId = sea.id
          LEFT JOIN tbl_colour col ON s.colourId = col.id
          WHERE s.bomId = ?`,
-      [bom.articleId, id]
+      [bom.articleId, bom.articleId, id]
     );
 
     const FileUtils = require("../utils/file.utils");

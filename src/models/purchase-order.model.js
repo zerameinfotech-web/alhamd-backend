@@ -196,19 +196,53 @@ class PurchaseOrderModel {
       whereParams.push(bomId);
     }
 
-    const result = await DatabaseUtils.selectPaginated(
-      "tbl_purchase_order po LEFT JOIN tbl_supplier s ON po.supplierId = s.id LEFT JOIN tbl_bom b ON po.bomId = b.id",
-      "po.*, s.name as supplierName, b.bomCode as bomCode, (SELECT COUNT(*) FROM tbl_grn WHERE poNo = po.poNo) as grnCount",
-      whereClause,
-      whereParams,
-      page,
-      limit,
-      "po.id DESC"
+    // Base PO no = part before vendor suffix `-NN`. PO-0042-01 → PO-0042.
+    const baseExpr = "IF(LOCATE('-', po.poNo, 4) > 0, LEFT(po.poNo, LOCATE('-', po.poNo, 4) - 1), po.poNo)";
+    const offset = (page - 1) * limit;
+
+    const baseRows = await DatabaseUtils.query(
+      `SELECT ${baseExpr} AS basePoNo, MAX(po.id) AS sortKey
+       FROM tbl_purchase_order po
+       LEFT JOIN tbl_supplier s ON po.supplierId = s.id
+       LEFT JOIN tbl_bom b ON po.bomId = b.id
+       WHERE ${whereClause}
+       GROUP BY basePoNo
+       ORDER BY sortKey DESC
+       LIMIT ? OFFSET ?`,
+      [...whereParams, limit, offset]
     );
 
-    const poList = result.data;
+    const countRows = await DatabaseUtils.query(
+      `SELECT COUNT(*) AS total FROM (
+         SELECT ${baseExpr} AS basePoNo
+         FROM tbl_purchase_order po
+         LEFT JOIN tbl_supplier s ON po.supplierId = s.id
+         LEFT JOIN tbl_bom b ON po.bomId = b.id
+         WHERE ${whereClause}
+         GROUP BY basePoNo
+       ) t`,
+      whereParams
+    );
+    const totalCount = countRows[0]?.total || 0;
 
-    // Fetch items for each PO
+    if (baseRows.length === 0) {
+      return { list: [], totalCount };
+    }
+
+    const bases = baseRows.map(r => r.basePoNo);
+    const placeholders = bases.map(() => "?").join(",");
+    const poList = await DatabaseUtils.query(
+      `SELECT po.*, s.name as supplierName, b.bomCode as bomCode,
+              (SELECT COUNT(*) FROM tbl_grn WHERE poNo = po.poNo) as grnCount,
+              ${baseExpr} AS basePoNo
+       FROM tbl_purchase_order po
+       LEFT JOIN tbl_supplier s ON po.supplierId = s.id
+       LEFT JOIN tbl_bom b ON po.bomId = b.id
+       WHERE ${baseExpr} IN (${placeholders})
+       ORDER BY FIELD(${baseExpr}, ${placeholders}), po.id DESC`,
+      [...bases, ...bases]
+    );
+
     for (let i = 0; i < poList.length; i++) {
       poList[i].items = await DatabaseUtils.query(
         `SELECT poi.*, ig.name as itemGroupName, u.name as uomName, m.name as materialName
@@ -221,10 +255,7 @@ class PurchaseOrderModel {
       );
     }
 
-    return {
-      list: poList,
-      totalCount: result.pagination.total
-    };
+    return { list: poList, totalCount };
   }
 
   static async listBOMWise(page = 1, limit = 10, searchTerm = "") {
@@ -356,18 +387,29 @@ class PurchaseOrderModel {
     if (header.length === 0) return null;
 
     const items = await DatabaseUtils.query(
-      `SELECT poi.*, ig.name as itemGroupName, u.name as uomName, m.name as materialName
+      `SELECT poi.*, ig.name as itemGroupName, u.name as uomName, m.name as materialName,
+              o.orderCode as orderCode, o.orderName as orderName
        FROM tbl_purchase_order_items poi
        LEFT JOIN tbl_item_group ig ON poi.itemGroupId = ig.id
        LEFT JOIN tbl_uom u ON poi.uomId = u.id
        LEFT JOIN tbl_material m ON poi.materialId = m.id
+       LEFT JOIN tbl_orders o ON poi.orderId = o.id
+       WHERE poi.poId = ?`,
+      [id]
+    );
+
+    const orderSummary = await DatabaseUtils.query(
+      `SELECT DISTINCT o.id, o.orderCode, o.orderName
+       FROM tbl_purchase_order_items poi
+       INNER JOIN tbl_orders o ON poi.orderId = o.id
        WHERE poi.poId = ?`,
       [id]
     );
 
     return {
       ...header[0],
-      items
+      items,
+      orders: orderSummary
     };
   }
 }

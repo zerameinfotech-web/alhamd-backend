@@ -3,13 +3,14 @@ const QCModel = require("../models/qc.model");
 class QCController {
   static async list(req, res) {
     try {
-      const { page, limit, searchTerm, type, bomId } = req.body;
+      const { page, limit, searchTerm, type, bomId, poType } = req.body;
       const data = await QCModel.list(
         parseInt(page) || 1,
         parseInt(limit) || 10,
         searchTerm || "",
         type || "accepted",
-        bomId
+        bomId,
+        poType || null
       );
       res.json({ success: true, ...data });
     } catch (e) {

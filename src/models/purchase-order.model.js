@@ -28,6 +28,18 @@ class PurchaseOrderModel {
       }
     }
 
+    // Backfill: classify rows missing poType as General when no supplier+bom
+    try {
+      await DatabaseUtils.query(
+        "UPDATE tbl_purchase_order SET poType = 'General' WHERE (poType IS NULL OR poType = '') AND supplierId IS NULL AND bomId IS NULL"
+      );
+      await DatabaseUtils.query(
+        "UPDATE tbl_purchase_order SET poType = 'Regular' WHERE poType IS NULL OR poType = ''"
+      );
+    } catch (e) {
+      // ignore if column missing or no rows
+    }
+
     // Ensure Items table has orderId
     try {
         await DatabaseUtils.query("ALTER TABLE tbl_purchase_order_items ADD COLUMN orderId INT AFTER poId");
@@ -187,6 +199,7 @@ class PurchaseOrderModel {
   }
 
   static async list(page = 1, limit = 10, searchTerm = "", bomId = null, poType = null) {
+    await this._ensureSchema();
     let whereClause = "1=1";
     let whereParams = [];
 

@@ -104,10 +104,10 @@ class QCModel {
     return `QC-${String(lastNum + 1).padStart(4, "0")}`;
   }
 
-  static async list(page = 1, limit = 10, searchTerm = "", type = "accepted", bomId = null) {
+  static async list(page = 1, limit = 10, searchTerm = "", type = "accepted", bomId = null, poType = null) {
     await this._ensureSchema();
     let sql = `
-      SELECT q.id as qcId, q.*, g.grnNo, g.poNo, g.supplierName, g.totalAmount, w.name as warehouseName,
+      SELECT q.id as qcId, q.*, g.grnNo, g.poNo, g.supplierName, g.poType, g.totalAmount, w.name as warehouseName,
              (SELECT SUM(qi2.acceptedQty) FROM tbl_qc_items qi2 WHERE qi2.qcId = q.id) as totalAccepted,
              (SELECT SUM(qi2.rejectedQty) FROM tbl_qc_items qi2 WHERE qi2.qcId = q.id) as totalRejected
       FROM tbl_qc q
@@ -130,6 +130,12 @@ class QCModel {
       params.push(bomId);
     }
 
+    if (poType === 'General') {
+      sql += " AND g.poType = 'General'";
+    } else if (poType === 'Regular') {
+      sql += " AND (g.poType = 'Regular' OR g.poType IS NULL OR g.poType = '')";
+    }
+
     if (searchTerm) {
       sql += " AND (q.qcNo LIKE ? OR g.grnNo LIKE ? OR g.supplierName LIKE ?)";
       const term = `%${searchTerm}%`;
@@ -145,13 +151,15 @@ class QCModel {
     for (let i = 0; i < rows.length; i++) {
       const qcId = rows[i].qcId || rows[i].id;
       const items = await DatabaseUtils.query(`
-        SELECT 
+        SELECT
           qi.*,
-          COALESCE(NULLIF(qi.materialName, ''), m.name) as materialName, 
-          u.name as uom
+          COALESCE(NULLIF(qi.materialName, ''), m.name) as materialName,
+          u.name as uom,
+          ig.name as itemGroupName
         FROM tbl_qc_items qi
         LEFT JOIN tbl_material m ON qi.materialId = m.id
         LEFT JOIN tbl_uom u ON qi.uomId = u.id
+        LEFT JOIN tbl_item_group ig ON m.itemGroupId = ig.id
         WHERE qi.qcId = ?
       `, [qcId]);
       rows[i].items = items;

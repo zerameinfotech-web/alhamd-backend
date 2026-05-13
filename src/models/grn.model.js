@@ -94,6 +94,12 @@ class GRNModel {
       if (!hNames.includes('supplierGst')) {
           await DatabaseUtils.query("ALTER TABLE tbl_grn ADD supplierGst VARCHAR(50) AFTER postalCode");
       }
+      if (!hNames.includes('poType')) {
+          await DatabaseUtils.query("ALTER TABLE tbl_grn ADD poType VARCHAR(20) DEFAULT 'Regular' AFTER supplierGst");
+      }
+      try {
+          await DatabaseUtils.query("ALTER TABLE tbl_grn MODIFY COLUMN supplierName VARCHAR(255) NULL");
+      } catch (e) { /* may already be nullable */ }
 
       // Ensure columns exist for details
       const dCols = await DatabaseUtils.query("SHOW COLUMNS FROM tbl_grn_items");
@@ -121,18 +127,26 @@ class GRNModel {
   static async repairData() {
     try {
 
-      // 1. Repair missing supplier names from POs
+      // 1. Repair missing supplier names from POs (skip general POs with no supplier)
       const missingSuppliers = await DatabaseUtils.query(`
         SELECT g.id, po.poNo, s.name as supplierName
         FROM tbl_grn g
         JOIN tbl_purchase_order po ON g.poNo = po.poNo
-        JOIN tbl_supplier s ON po.supplierId = s.id
-        WHERE g.supplierName IS NULL OR g.supplierName = ''
+        LEFT JOIN tbl_supplier s ON po.supplierId = s.id
+        WHERE (g.supplierName IS NULL OR g.supplierName = '') AND s.name IS NOT NULL
       `);
 
       for (const row of missingSuppliers) {
         await DatabaseUtils.update("tbl_grn", { supplierName: row.supplierName }, "id = ?", [row.id]);
       }
+
+      // 1b. Repair poType on legacy GRNs from PO
+      await DatabaseUtils.query(`
+        UPDATE tbl_grn g
+        JOIN tbl_purchase_order po ON g.poNo = po.poNo
+        SET g.poType = COALESCE(po.poType, 'Regular')
+        WHERE g.poType IS NULL OR g.poType = ''
+      `);
 
       // 2. Repair missing material_id by name match
       await DatabaseUtils.query(`
@@ -154,7 +168,7 @@ class GRNModel {
     }
   }
 
-  static async list(page = 1, limit = 10, searchTerm = "", bomId = null, type = null) {
+  static async list(page = 1, limit = 10, searchTerm = "", bomId = null, type = null, poType = null) {
     await this._ensureSchema();
     let whereClause = "1=1";
     let whereParams = [];
@@ -173,6 +187,12 @@ class GRNModel {
     if (bomId) {
       whereClause += " AND po.bomId = ?";
       whereParams.push(bomId);
+    }
+
+    if (poType === 'General') {
+      whereClause += " AND g.poType = 'General'";
+    } else if (poType === 'Regular') {
+      whereClause += " AND (g.poType = 'Regular' OR g.poType IS NULL OR g.poType = '')";
     }
 
     const result = await DatabaseUtils.selectPaginated(
@@ -268,14 +288,16 @@ class GRNModel {
       let grnId = data.id;
 
       let supplierName = data.supplierName;
-      if (!supplierName && data.poNo) {
+      let poType = data.poType || 'Regular';
+      if (data.poNo) {
         const poRows = await DatabaseUtils.query(
-          "SELECT s.name FROM tbl_purchase_order po JOIN tbl_supplier s ON po.supplierId = s.id WHERE po.poNo = ?",
+          "SELECT s.name AS supplierName, po.poType FROM tbl_purchase_order po LEFT JOIN tbl_supplier s ON po.supplierId = s.id WHERE po.poNo = ?",
           [data.poNo],
           connection
         );
         if (poRows.length > 0) {
-          supplierName = poRows[0].name;
+          if (!supplierName) supplierName = poRows[0].supplierName || null;
+          poType = poRows[0].poType || poType;
         }
       }
       const type = data.type || 'Receipt';
@@ -381,6 +403,7 @@ class GRNModel {
           grnDate: data.grnDate,
           poNo: data.poNo,
           supplierName: supplierName,
+          poType: poType,
           status: calculatedStatus,
           totalAmount: data.totalAmount || 0,
           warehouseId: data.warehouseId || null,
@@ -454,6 +477,7 @@ class GRNModel {
           linkGrnId: data.linkGrnId || null,
           type: type,
           supplierName: supplierName,
+          poType: poType,
           status: calculatedStatus,
           totalAmount: data.totalAmount || 0,
           warehouseId: data.warehouseId || null,

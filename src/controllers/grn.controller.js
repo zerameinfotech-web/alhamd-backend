@@ -13,8 +13,8 @@ class GRNController {
 
   static async list(req, res) {
     try {
-      const { page, limit, searchTerm, bomId, type } = req.body;
-      const result = await GRNModel.list(page, limit, searchTerm, bomId, type);
+      const { page, limit, searchTerm, bomId, type, poType } = req.body;
+      const result = await GRNModel.list(page, limit, searchTerm, bomId, type, poType);
       res.status(200).json({ success: true, list: result.list, totalCount: result.totalCount });
     } catch (err) {
       console.error("Error listing GRNs:", err);
